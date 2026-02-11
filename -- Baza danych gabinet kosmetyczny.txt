@@ -1,0 +1,178 @@
+-- Baza danych: gabinet kosmetyczny 
+
+CREATE DATABASE IF NOT EXISTS `beauty_clinic_app`
+  DEFAULT CHARACTER SET utf8mb4
+  COLLATE utf8mb4_unicode_ci;
+
+USE `beauty_clinic_app`;
+
+
+
+CREATE TABLE `user_account` (
+  `id` CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  `email` VARCHAR(255) NOT NULL,
+  `password_hash` VARCHAR(255) NOT NULL,
+  `mfa_enabled` TINYINT(1) NOT NULL,
+  `status` VARCHAR(20) NOT NULL,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_user_email` (`email`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+
+CREATE TABLE `role` (
+  `id` CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  `name` VARCHAR(20) NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_role_name` (`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+CREATE TABLE `user_role` (
+  `user_id` CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  `role_id` CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  PRIMARY KEY (`user_id`,`role_id`),
+  KEY `idx_ur_role` (`role_id`),
+  CONSTRAINT `fk_ur_user`
+    FOREIGN KEY (`user_id`) REFERENCES `user_account`(`id`)
+    ON UPDATE CASCADE ON DELETE CASCADE,
+  CONSTRAINT `fk_ur_role`
+    FOREIGN KEY (`role_id`) REFERENCES `role`(`id`)
+    ON UPDATE CASCADE ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+CREATE TABLE `client_profile` (
+  `id` CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  `user_id` CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  `first_name` VARCHAR(80) NOT NULL,
+  `last_name` VARCHAR(80) NOT NULL,
+  `birth_date` DATE NOT NULL,
+  `phone` VARCHAR(20) NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_client_user` (`user_id`),
+  CONSTRAINT `fk_client_user`
+    FOREIGN KEY (`user_id`) REFERENCES `user_account`(`id`)
+    ON UPDATE CASCADE ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+
+CREATE TABLE `staff_member` (
+  `id` CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  `user_id` CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  `staff_type` VARCHAR(20) NOT NULL,
+  `specialization` VARCHAR(120) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_staff_user` (`user_id`),
+  CONSTRAINT `fk_staff_user`
+    FOREIGN KEY (`user_id`) REFERENCES `user_account`(`id`)
+    ON UPDATE CASCADE ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+
+CREATE TABLE `treatment_session` (
+  `id` CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  `client_id` CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  `staff_id` CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  `service_type` VARCHAR(40) NOT NULL,
+  `start_time` DATETIME NOT NULL,
+  `end_time` DATETIME NOT NULL,
+  `status` VARCHAR(20) NOT NULL,
+  `price_snapshot` DECIMAL(10,2) NOT NULL,
+  `created_by` CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_ts_client_time` (`client_id`,`start_time`),
+  KEY `idx_ts_staff_time` (`staff_id`,`start_time`),
+  KEY `idx_ts_creator` (`created_by`),
+  CONSTRAINT `fk_ts_client`
+    FOREIGN KEY (`client_id`) REFERENCES `client_profile`(`id`)
+    ON UPDATE CASCADE ON DELETE RESTRICT,
+  CONSTRAINT `fk_ts_staff`
+    FOREIGN KEY (`staff_id`) REFERENCES `staff_member`(`id`)
+    ON UPDATE CASCADE ON DELETE RESTRICT,
+  CONSTRAINT `fk_ts_creator`
+    FOREIGN KEY (`created_by`) REFERENCES `user_account`(`id`)
+    ON UPDATE CASCADE ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+
+CREATE TABLE `treatment_card` (
+  `id` CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  `treatment_session_id` CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  `author_staff_id` CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  `procedure_description` TEXT NOT NULL,
+  `used_products` TEXT DEFAULT NULL,
+  `aftercare_recommendations` TEXT DEFAULT NULL,
+  `created_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_tc_session` (`treatment_session_id`),
+  KEY `idx_tc_author` (`author_staff_id`),
+  CONSTRAINT `fk_tc_session`
+    FOREIGN KEY (`treatment_session_id`)
+    REFERENCES `treatment_session`(`id`)
+    ON UPDATE CASCADE ON DELETE CASCADE,
+  CONSTRAINT `fk_tc_author`
+    FOREIGN KEY (`author_staff_id`)
+    REFERENCES `staff_member`(`id`)
+    ON UPDATE CASCADE ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+
+CREATE TABLE `reminder` (
+  `id` CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  `treatment_session_id` CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  `channel` VARCHAR(20) NOT NULL,
+  `status` VARCHAR(20) NOT NULL,
+  `sent_at` DATETIME DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_rem_session` (`treatment_session_id`),
+  CONSTRAINT `fk_rem_session`
+    FOREIGN KEY (`treatment_session_id`)
+    REFERENCES `treatment_session`(`id`)
+    ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+
+CREATE TABLE `consent` (
+  `id` CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  `client_id` CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  `consent_type` VARCHAR(30) NOT NULL,
+  `granted` TINYINT(1) NOT NULL,
+  `created_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_consent_client` (`client_id`),
+  CONSTRAINT `fk_consent_client`
+    FOREIGN KEY (`client_id`)
+    REFERENCES `client_profile`(`id`)
+    ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+CREATE TABLE `delegation` (
+  `id` CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  `principal_user_id` CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  `proxy_user_id` CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  `scope` VARCHAR(120) NOT NULL,
+  `valid_from` DATE NOT NULL,
+  `valid_to` DATE DEFAULT NULL,
+  `status` VARCHAR(20) NOT NULL,
+  `created_at` DATETIME NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_del_principal` (`principal_user_id`),
+  KEY `idx_del_proxy` (`proxy_user_id`),
+  CONSTRAINT `fk_del_principal`
+    FOREIGN KEY (`principal_user_id`)
+    REFERENCES `user_account`(`id`)
+    ON UPDATE CASCADE ON DELETE CASCADE,
+  CONSTRAINT `fk_del_proxy`
+    FOREIGN KEY (`proxy_user_id`)
+    REFERENCES `user_account`(`id`)
+    ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
